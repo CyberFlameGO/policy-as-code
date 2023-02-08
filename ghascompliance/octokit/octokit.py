@@ -6,8 +6,14 @@ import logging
 import requests
 from urllib.parse import urlparse
 
+from ratelimit import limits, sleep_and_retry
+
 from ghascompliance.__version__ import __name__
 from ghascompliance.consts import API_ERRORS
+
+# https://docs.github.com/en/enterprise-cloud@latest/rest/overview/resources-in-the-rest-api#rate-limiting
+ONE_MINUTE = 60
+MAX_CALLS_PER_MINUTE = 80  # ~5000 per hour
 
 
 class GitHub:
@@ -240,6 +246,8 @@ class OctoRequests(Octokit):
 
     def request(method, url, params={}):
         def decorator(func):
+            @sleep_and_retry
+            @limits(calls=MAX_CALLS_PER_MINUTE, period=ONE_MINUTE)
             def wrap(self, **kwargs):
                 full_url = self.github.get("api.rest") + self.format(url)
                 full_response = []
